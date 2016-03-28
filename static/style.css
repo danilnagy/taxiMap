@@ -10,10 +10,18 @@ html, body, #map {
 }
 
 circle {
-	fill-opacity: .3;
-	fill: gray;
+	fill-opacity: .1;
 	stroke-width: 0px;
 }
+
+circle.marker {
+	fill: blue;
+}
+
+circle.interp {
+	fill: green;
+}
+
 circle:hover {
 	stroke: black;
 	stroke-width: 2px;

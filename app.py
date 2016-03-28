@@ -3,6 +3,9 @@ from flask import render_template
 from flask import request
 from flask import Response
 
+import pickle
+import numpy as np
+
 import json
 import time
 import sys
@@ -11,50 +14,51 @@ import math
 
 import pyorient
 
-from Queue import Queue
-
 from sklearn import preprocessing
 from sklearn import svm
+from multiprocessing import Pool
 
-import numpy as np
+from polyline.codec import PolylineCodec as pl
+import requests
+
+
 
 app = Flask(__name__)
 
-q = Queue()
+def lineLength(pt1, pt2):
+	return ( (pt2[0] - pt1[0])**2 + (pt2[1] - pt1[1])**2 ) ** .5
 
-def point_distance(x1, y1, x2, y2):
-	return ((x1-x2)**2.0 + (y1-y2)**2.0)**(0.5)
+def interpolate(pt1, pt2):
+	dist = .0005
+	l = lineLength(pt1, pt2)
 
-def remap(value, min1, max1, min2, max2):
-	return float(min2) + (float(value) - float(min1)) * (float(max2) - float(min2)) / (float(max1) - float(min1))
+	pts = []
+	
+	if l > dist:
+		div = int(math.floor(l / dist))
+		# br = l / div
+		dx = (pt2[0] - pt1[0]) / div
+		dy = (pt2[1] - pt1[1]) / div
 
-def normalizeArray(inputArray):
-	maxVal = 0
-	minVal = 100000000000
+		x = pt1[0]
+		y = pt1[1]
 
-	for j in range(len(inputArray)):
-		for i in range(len(inputArray[j])):
-			if inputArray[j][i] > maxVal:
-				maxVal = inputArray[j][i]
-			if inputArray[j][i] < minVal:
-				minVal = inputArray[j][i]
+		for i in range(div-1):
+			x += dx
+			y += dy
+			pts.append([x, y])
 
-	for j in range(len(inputArray)):
-		for i in range(len(inputArray[j])):
-			inputArray[j][i] = remap(inputArray[j][i], minVal, maxVal, 0, 1)
+	return pts
 
-	return inputArray
+def func(data, model):
+	return model.predict(data)
 
-def event_stream():
-    while True:
-        result = q.get()
-        yield 'data: %s\n\n' % str(result)
+def predict(data, scaler, model):
 
-@app.route('/eventSource/')
-def sse_source():
-    return Response(
-            event_stream(),
-            mimetype='text/event-stream')
+	d_scaled = scaler.transform(data)
+	# print d_scaled
+	prediction = model.predict(d_scaled)
+	return max(0, prediction[0])
 
 @app.route("/")
 def index():
@@ -63,193 +67,78 @@ def index():
 @app.route("/getData/")
 def getData():
 
-	q.put("starting data query...")
+	lat1 = str(request.args.get('lat'))
+	lng1 = str(request.args.get('lng'))
 
-	lat1 = str(request.args.get('lat1'))
-	lng1 = str(request.args.get('lng1'))
-	lat2 = str(request.args.get('lat2'))
-	lng2 = str(request.args.get('lng2'))
+	print lat1, lng1
 
-	w = float(request.args.get('w'))
-	h = float(request.args.get('h'))
-	cell_size = float(request.args.get('cell_size'))
+	start_time = time.time()
 
-	analysis = request.args.get('analysis')
-	analysisType = request.args.get('analysisType')
+	print "loading model..."
 
-	#CAPTURE ANY ADDITIONAL ARGUMENTS SENT FROM THE CLIENT HERE
+	local_path = "C:\\Users\\danil\\Google Drive\\SYNC\\Taxi\\"
 
-	print "received coordinates: [" + lat1 + ", " + lat2 + "], [" + lng1 + ", " + lng2 + "]"
-	
-	client = pyorient.OrientDB("localhost", 2424)
-	session_id = client.connect("root", "password")
-	db_name = "soufun"
-	db_username = "admin"
-	db_password = "admin"
+	with open(local_path + 'dataModel.pkl', 'rb') as f:
+		dataModel = pickle.load(f)
 
-	if client.db_exists( db_name, pyorient.STORAGE_TYPE_MEMORY ):
-		client.db_open( db_name, db_username, db_password )
-		print db_name + " opened successfully"
-	else:
-		print "database [" + db_name + "] does not exist! session ending..."
-		sys.exit()
+	with open(local_path + 'scaler.pkl', 'rb') as f:
+		scaler = pickle.load(f)
 
-	query = 'SELECT FROM Listing WHERE latitude BETWEEN {} AND {} AND longitude BETWEEN {} AND {} AND prec = 1 AND conf > 60'
+	print "model loaded [" + str(int(time.time() - start_time)) + " sec]"
 
-	records = client.command(query.format(lat1, lat2, lng1, lng2))
 
-	numListings = len(records)
-	print 'received ' + str(numListings) + ' records'
+	lat2 = 40.767756
+	lng2 = -73.993176
 
-	client.db_close()
+	api_key = "AIzaSyB9WjQBjO2QMrBfXPpj9BuLUhLW3LfnE9g"
 
-	# iterate through data to find minimum and maximum price
-	minPrice = 1000000000
-	maxPrice = 0
+	request_str = "https://maps.googleapis.com/maps/api/directions/json?origin={}+{}&destination={}+{}&avoid=highways&alternatives=true&key={}".format(lat1, lng1, lat2, lng2, api_key)
 
-	for record in records:
-		price = record.price
+	r = requests.get(request_str)
+	data = r.json()
 
-		if price > maxPrice:
-			maxPrice = price
-		if price < minPrice:
-			minPrice = price
+	# data = []
 
-	print minPrice
-	print maxPrice
+	# doy = 1 # January 1st
+	dow = 1 # Monday
+	tod = 1 # 6am - noon
+	# temp = 60 # 60 deg F
+	# condition = 0 # clear
 
-	output = {"type":"FeatureCollection","features":[]}
+	output = {"type":"FeatureCollection","features":[], "points":[], "points_interp":[]}
 
-	for record in records:
-		feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
-		feature["id"] = record._rid
-		feature["properties"]["name"] = record.title
-		feature["properties"]["price"] = record.price
-		feature["properties"]["priceNorm"] = remap(record.price, minPrice, maxPrice, 0, 1)
-		feature["geometry"]["coordinates"] = [record.latitude, record.longitude]
+	for route in data['routes']:
+		route_str = route['overview_polyline']['points']
+		route_points = pl().decode(route_str)
+
+		feature = {"type":"Feature","properties":{},"geometry":{"type":"LineString"}}
+		feature["geometry"]["coordinates"] = route_points
 
 		output["features"].append(feature)
 
-	if analysis == "false":
-		q.put('idle')
-		return json.dumps(output)
+		for route_point in route_points:
+			feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+			feature["geometry"]["coordinates"] = route_point
 
-	q.put('starting analysis...')
+			data_point = np.asarray([dow, tod, route_point[0], route_point[1]], dtype='float').reshape(1,-1)
+			p = predict(data_point, scaler, dataModel)
+			feature["properties"]["prediction"] = p
 
-	output["analysis"] = []
+			output["points"].append(feature)
 
-	numW = int(math.floor(w/cell_size))
-	numH = int(math.floor(h/cell_size))
+		for i, route_point in enumerate(route_points[:-1]):
 
-	grid = []
+			pts = interpolate(route_point, route_points[i+1])
 
-	for j in range(numH):
-		grid.append([])
-		for i in range(numW):
-			grid[j].append(0)
+			for pt in pts:
+				feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+				feature["geometry"]["coordinates"] = pt
 
-	if analysisType == "heatmap":
-		## HEAT MAP IMPLEMENTATION
-		for record in records:
+				data_point = np.asarray([dow, tod, pt[0], pt[1]], dtype='float').reshape(1,-1)
+				p = predict(data_point, scaler, dataModel)
+				feature["properties"]["prediction"] = p
 
-			pos_x = int(remap(record.longitude, lng1, lng2, 0, numW))
-			pos_y = int(remap(record.latitude, lat1, lat2, numH, 0))
-
-			spread = 12
-
-			for j in range(max(0, (pos_y-spread)), min(numH, (pos_y+spread))):
-				for i in range(max(0, (pos_x-spread)), min(numW, (pos_x+spread))):
-					grid[j][i] += 2 * math.exp((-point_distance(i,j,pos_x,pos_y)**2)/(2*(spread/2)**2))
-
-		q.put('idle')
-
-	else:
-		## MACHINE LEARNING IMPLEMENTATION
-		featureData = []
-		targetData = []
-
-		for record in records:
-			featureData.append([record.latitude, record.longitude])
-			targetData.append(record.price)
-
-		X = np.asarray(featureData, dtype='float')
-		y = np.asarray(targetData, dtype='float')
-
-		breakpoint = int(numListings * .7)
-
-		print "length of dataset: " + str(numListings)
-		print "length of training set: " + str(breakpoint)
-		print "length of validation set: " + str(numListings-breakpoint)
-
-		# create training and validation set
-		X_train = X[:breakpoint]
-		X_val = X[breakpoint:]
-
-		y_train = y[:breakpoint]
-		y_val = y[breakpoint:]
-
-		#mean 0, variance 1
-		scaler = preprocessing.StandardScaler().fit(X_train)
-		X_train_scaled = scaler.transform(X_train)
-
-		mse_min = 10000000000000000000000
-
-		# add values to arrays in nested loops to test other models
-		for C in [10000]:
-
-			for e in [10000]:
-
-					for g in [0.0]:
-
-						q.put("training model: C[" + str(C) + "], e[" + str(e) + "], g[" + str(g) + "]")
-
-						model = svm.SVR(C=C, epsilon=e, gamma=g, kernel='rbf', cache_size=2000)
-						model.fit(X_train_scaled, y_train)
-
-						y_val_p = [model.predict(i) for i in X_val]
-
-						mse = 0
-						for i in range(len(y_val_p)):
-							mse += (y_val_p[i] - y_val[i]) ** 2
-						mse /= len(y_val_p)
-
-						if mse < mse_min:
-							mse_min = mse
-							model_best = model
-							C_best = C
-							e_best = e
-							g_best = g
-
-		q.put("best model: C[" + str(C_best) + "], e[" + str(e_best) + "], g[" + str(g_best) + "]")
-
-		for j in range(numH):
-			for i in range(numW):
-				lat = remap(j, numH, 0, lat1, lat2)
-				lng = remap(i, 0, numW, lng1, lng2)
-
-				testData = [[lat, lng]]
-				X_test = np.asarray(testData, dtype='float')
-				X_test_scaled = scaler.transform(X_test)
-				grid[j][i] = model_best.predict(X_test_scaled)
-
-
-
-	grid = normalizeArray(grid)
-
-	offsetLeft = (w - numW * cell_size) / 2.0
-	offsetTop = (h - numH * cell_size) / 2.0
-
-	for j in range(numH):
-		for i in range(numW):
-			newItem = {}
-
-			newItem['x'] = offsetLeft + i*cell_size
-			newItem['y'] = offsetTop + j*cell_size
-			newItem['width'] = cell_size-1
-			newItem['height'] = cell_size-1
-			newItem['value'] = grid[j][i]
-
-			output["analysis"].append(newItem)
+				output["points_interp"].append(feature)
 
 	return json.dumps(output)
 
