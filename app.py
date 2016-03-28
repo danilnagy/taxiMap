@@ -21,6 +21,8 @@ from multiprocessing import Pool
 from polyline.codec import PolylineCodec as pl
 import requests
 
+import operator
+
 
 
 app = Flask(__name__)
@@ -187,6 +189,7 @@ def getData():
 
 	# data = []
 
+	prediction_averages = []
 
 	for route in data['routes']:
 		route_str = route['overview_polyline']['points']
@@ -194,34 +197,59 @@ def getData():
 
 		feature = {"type":"Feature","properties":{},"geometry":{"type":"LineString"}}
 		feature["geometry"]["coordinates"] = route_points
+		feature["properties"]["category"] = "route"
 
 		output["features"].append(feature)
 
-		for route_point in route_points:
+		all_points = []
+
+		for i, route_point in enumerate(route_points):
+
+			all_points.append(route_point)
+
+			if i < len(route_points) - 1:
+				pts = interpolate(route_point, route_points[i+1])
+				all_points += pts
+
+		predictions = []
+
+		for route_point in all_points:
+
 			feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
 			feature["geometry"]["coordinates"] = route_point
 
-			# print route_point[0], route_point[1]
-
 			data_point = np.asarray([dow, tod, route_point[0], route_point[1]], dtype='float').reshape(1,-1)
 			p = predict(data_point, scaler, dataModel)
+
+			predictions.append(p)
 			feature["properties"]["prediction"] = p
 
 			output["points"].append(feature)
 
-		for i, route_point in enumerate(route_points[:-1]):
+		prediction_averages.append(sum(predictions)/float(len(predictions)))
 
-			pts = interpolate(route_point, route_points[i+1])
+	[bestRoute, bestValue] = max(enumerate(prediction_averages), key=operator.itemgetter(1))
 
-			for pt in pts:
-				feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
-				feature["geometry"]["coordinates"] = pt
+	print prediction_averages
+	print bestRoute
 
-				data_point = np.asarray([dow, tod, pt[0], pt[1]], dtype='float').reshape(1,-1)
-				p = predict(data_point, scaler, dataModel)
-				feature["properties"]["prediction"] = p
+	output["features"][bestRoute]["properties"]["category"] = "best"
 
-				output["points"].append(feature)
+
+
+		# for i, route_point in enumerate(route_points[:-1]):
+
+		# 	pts = interpolate(route_point, route_points[i+1])
+
+		# 	for pt in pts:
+		# 		feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+		# 		feature["geometry"]["coordinates"] = pt
+
+		# 		data_point = np.asarray([dow, tod, pt[0], pt[1]], dtype='float').reshape(1,-1)
+		# 		p = predict(data_point, scaler, dataModel)
+		# 		feature["properties"]["prediction"] = p
+
+		# 		output["points"].append(feature)
 
 	
 

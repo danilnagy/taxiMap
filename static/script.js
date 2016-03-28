@@ -22,8 +22,8 @@ L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_toke
 }).addTo(map);
 
 map.on('click', function(e) {
-    // alert("Lat, Lon : " + e.latlng.lat + ", " + e.latlng.lng)
-    updateData(e.latlng.lat, e.latlng.lng)
+	// alert("Lat, Lon : " + e.latlng.lat + ", " + e.latlng.lng)
+	updateData(e.latlng.lat, e.latlng.lng)
 });
 
 //create variables to store a reference to svg and g elements
@@ -77,12 +77,12 @@ function updateData(lat3, lng3){
 
 	console.log(request);
 
-  	d3.json(request, function(data) {
+	d3.json(request, function(data) {
 
-  		console.log(data);
+		console.log(data);
 
 
-  		var topleft = projectPoint(lat2, lng1);
+		var topleft = projectPoint(lat2, lng1);
 
 		svg_overlay.attr("width", w)
 			.attr("height", h)
@@ -97,45 +97,45 @@ function updateData(lat3, lng3){
 			.attr("y", function(d) { return d.y; })
 			.attr("width", function(d) { return d.width; })
 			.attr("height", function(d) { return d.height; })
-	    	.attr("fill-opacity", ".2")
-	    	.attr("fill", function(d) { return "hsl(" + Math.floor((1-d.value)*250) + ", 100%, 50%)"; });
+			.attr("fill-opacity", ".2")
+			.attr("fill", function(d) { return "hsl(" + Math.floor((1-d.value)*250) + ", 100%, 50%)"; });
 		
 
 
-  		var lines = g1.selectAll("path")
-  			.data(data.features);
-  		
+		var lines = g1.selectAll("path")
+			.data(data.features);
+		
 		lines.exit().remove();
 
-  		lines.enter()
-  			.append("path")
-  			.attr("stroke", "red")
-  			.attr("stroke-width", "5")
-  			.attr("stroke-linecap", "round")
-  			.attr("stroke-linejoin", "round")
-  			.attr("fill-opacity", "0")
-  		;
-
-  		var markers = g1.selectAll("circle")
-  			.data(data.points);
-  		
-  		markers.exit().remove();
-
-  		markers.enter()
-			.append("circle")
-			.attr("class", "marker")
+		lines.enter()
+			.append("path")
 		;
 
-		markers.attr("r", function(d){
-				return d.properties.prediction * 5
+		lines.attr("id", function(d){
+				return d.properties.category;
 			})
 		;
+
+		// var markers = g1.selectAll("circle")
+		// 	.data(data.points);
+		
+		// markers.exit().remove();
+
+		// markers.enter()
+		// 	.append("circle")
+		// 	.attr("class", "marker")
+		// ;
+
+		// markers.attr("r", function(d){
+		// 		return d.properties.prediction * 5
+		// 	})
+		// ;
 
 
 
   // 		var interp = g2.selectAll("circle")
   // 			.data(data.points_interp);
-  		
+		
   // 		interp.exit().remove();
 
   // 		interp.enter()
@@ -146,16 +146,16 @@ function updateData(lat3, lng3){
 		// 	})
 		// ;
 
-  		map.on("viewreset", reset);
-  		reset();
+		map.on("viewreset", reset);
+		reset();
 
-  		function reset() {
+		function reset() {
 
-	  		var bounds = path.bounds(data),
-		    topLeft = bounds[0],
-		    bottomRight = bounds[1];
+			var bounds = path.bounds(data),
+			topLeft = bounds[0],
+			bottomRight = bounds[1];
 
-		    var buffer = 50;
+			var buffer = 50;
 
 			// reposition the SVG to cover the features.
 			svg .attr("width", bottomRight[0] - topLeft[0] + (buffer * 2))
@@ -167,16 +167,16 @@ function updateData(lat3, lng3){
 			// g2   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
 
 
-  			lines
-	  			.attr("d", path)
-  			;
-
-  			markers
-				.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
-				.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
+			lines
+				.attr("d", path)
 			;
 
-  	// 		interp
+			// markers
+			// 	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
+			// 	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
+			// ;
+
+	// 		interp
 			// 	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
 			// 	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
 			// ;
