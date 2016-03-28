@@ -28,6 +28,9 @@ map.on('click', function(e) {
 
 //create variables to store a reference to svg and g elements
 
+var svg_overlay = d3.select(map.getPanes().overlayPane).append("svg");
+var g_overlay = svg_overlay.append("g").attr("class", "leaflet-zoom-hide");
+
 var svg = d3.select(map.getPanes().overlayPane).append("svg");
 var g1 = svg.append("g").attr("class", "leaflet-zoom-hide");
 var g2 = svg.append("g").attr("class", "leaflet-zoom-hide");
@@ -56,17 +59,48 @@ function projectStream(lat, lng) {
 var transform = d3.geo.transform({point: projectStream});
 var path = d3.geo.path().projection(transform);
 
-function updateData(lat, lng){
+function updateData(lat3, lng3){
 
-	// var path = d3.geo.path().projection(d3.geo.mercator);
+	var mapBounds = map.getBounds();
+	var lat1 = mapBounds["_southWest"]["lat"];
+	var lat2 = mapBounds["_northEast"]["lat"];
+	var lng1 = mapBounds["_southWest"]["lng"];
+	var lng2 = mapBounds["_northEast"]["lng"];
 
-	console.log(lat, lng)
+	// CAPTURE USER INPUT FOR CELL SIZE FROM HTML ELEMENTS
+	var cell_size = 25;
+	var w = window.innerWidth;
+	var h = window.innerHeight;
 
-	request = "/getData?lat=" + lat + "&lng=" + lng
+	// SEND USER CHOICES FOR ANALYSIS TYPE, CELL SIZE, HEAT MAP SPREAD, ETC. TO SERVER
+	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lat3=" + lat3 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&lng3=" + lng3 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size
+
+	console.log(request);
 
   	d3.json(request, function(data) {
 
   		console.log(data);
+
+
+  		var topleft = projectPoint(lat2, lng1);
+
+		svg_overlay.attr("width", w)
+			.attr("height", h)
+			.style("left", topleft.x + "px")
+			.style("top", topleft.y + "px");
+
+		var rectangles = g_overlay.selectAll("rect").data(data.analysis);
+		rectangles.enter().append("rect");
+
+		rectangles
+			.attr("x", function(d) { return d.x; })
+			.attr("y", function(d) { return d.y; })
+			.attr("width", function(d) { return d.width; })
+			.attr("height", function(d) { return d.height; })
+	    	.attr("fill-opacity", ".2")
+	    	.attr("fill", function(d) { return "hsl(" + Math.floor((1-d.value)*250) + ", 100%, 50%)"; });
+		
+
 
   		var lines = g1.selectAll("path")
   			.data(data.features);
@@ -90,23 +124,27 @@ function updateData(lat, lng){
   		markers.enter()
 			.append("circle")
 			.attr("class", "marker")
-			.attr("r", function(d){
+		;
+
+		markers.attr("r", function(d){
 				return d.properties.prediction * 5
 			})
 		;
 
-  		var interp = g2.selectAll("circle")
-  			.data(data.points_interp);
+
+
+  // 		var interp = g2.selectAll("circle")
+  // 			.data(data.points_interp);
   		
-  		interp.exit().remove();
+  // 		interp.exit().remove();
 
-  		interp.enter()
-			.append("circle")
-			.attr("class", "interp")
-			.attr("r", function(d){
-				return d.properties.prediction * 5
-			})
-		;
+  // 		interp.enter()
+		// 	.append("circle")
+		// 	.attr("class", "interp")
+		// 	.attr("r", function(d){
+		// 		return d.properties.prediction * 5
+		// 	})
+		// ;
 
   		map.on("viewreset", reset);
   		reset();
@@ -126,7 +164,7 @@ function updateData(lat, lng){
 				.style("top", (topLeft[1] - buffer) + "px");
 
 			g1   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
-			g2   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
+			// g2   .attr("transform", "translate(" + (-topLeft[0] + buffer) + "," + (-topLeft[1] + buffer) + ")");
 
 
   			lines
@@ -138,10 +176,10 @@ function updateData(lat, lng){
 				.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
 			;
 
-  			interp
-				.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
-				.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
-			;
+  	// 		interp
+			// 	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
+			// 	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
+			// ;
 		}
 
 	});
