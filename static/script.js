@@ -1,12 +1,12 @@
 
 
-var eventOutputContainer = document.getElementById("message");
-var eventSrc = new EventSource("/eventSource");
+// var eventOutputContainer = document.getElementById("message");
+// var eventSrc = new EventSource("/eventSource");
 
-eventSrc.onmessage = function(e) {
-	console.log(e);
-	eventOutputContainer.innerHTML = e.data;
-};
+// eventSrc.onmessage = function(e) {
+// 	console.log(e);
+// 	eventOutputContainer.innerHTML = e.data;
+// };
 
 var tooltip = d3.select("div.tooltip");
 var tooltip_title = d3.select("#title");
@@ -21,10 +21,10 @@ L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_toke
 	accessToken: 'pk.eyJ1IjoiZGFuaWxuYWd5IiwiYSI6ImVobm1tZWsifQ.CGQL9qrfNzMYtaQMiI-c8A'
 }).addTo(map);
 
-map.on('click', function(e) {
-	// alert("Lat, Lon : " + e.latlng.lat + ", " + e.latlng.lng)
-	updateData(e.latlng.lat, e.latlng.lng)
-});
+// map.on('click', function(e) {
+// 	// alert("Lat, Lon : " + e.latlng.lat + ", " + e.latlng.lng)
+// 	updateData(e.latlng.lat, e.latlng.lng)
+// });
 
 //create variables to store a reference to svg and g elements
 
@@ -59,7 +59,7 @@ function projectStream(lat, lng) {
 var transform = d3.geo.transform({point: projectStream});
 var path = d3.geo.path().projection(transform);
 
-function updateData(lat3, lng3){
+function updateData(){
 
 	var mapBounds = map.getBounds();
 	var lat1 = mapBounds["_southWest"]["lat"];
@@ -73,7 +73,7 @@ function updateData(lat3, lng3){
 	var h = window.innerHeight;
 
 	// SEND USER CHOICES FOR ANALYSIS TYPE, CELL SIZE, HEAT MAP SPREAD, ETC. TO SERVER
-	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lat3=" + lat3 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&lng3=" + lng3 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size
+	request = "/getData?lat1=" + lat1 + "&lat2=" + lat2 + "&lng1=" + lng1 + "&lng2=" + lng2 + "&w=" + w + "&h=" + h + "&cell_size=" + cell_size
 
 	console.log(request);
 
@@ -116,20 +116,21 @@ function updateData(lat3, lng3){
 			})
 		;
 
-		// var markers = g1.selectAll("circle")
-		// 	.data(data.points);
+		var markers = g1.selectAll("circle")
+			.data(data.points);
 		
-		// markers.exit().remove();
+		markers.exit().remove();
 
-		// markers.enter()
-		// 	.append("circle")
-		// 	.attr("class", "marker")
-		// ;
+		markers.enter()
+			.append("circle")
+			.attr("class", "marker")
+		;
 
-		// markers.attr("r", function(d){
-		// 		return d.properties.prediction * 5
-		// 	})
-		// ;
+		markers
+			.attr("id", function(d){
+				return d.properties.id;
+			})
+		;
 
 
 
@@ -155,7 +156,7 @@ function updateData(lat3, lng3){
 			topLeft = bounds[0],
 			bottomRight = bounds[1];
 
-			var buffer = 50;
+			var buffer = 150;
 
 			// reposition the SVG to cover the features.
 			svg .attr("width", bottomRight[0] - topLeft[0] + (buffer * 2))
@@ -171,10 +172,10 @@ function updateData(lat3, lng3){
 				.attr("d", path)
 			;
 
-			// markers
-			// 	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
-			// 	.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
-			// ;
+			markers
+				.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
+				.attr("cy", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).y; })
+			;
 
 	// 		interp
 			// 	.attr("cx", function(d) { return projectPoint(d.geometry.coordinates[0], d.geometry.coordinates[1]).x; })
@@ -185,5 +186,25 @@ function updateData(lat3, lng3){
 	});
 
 };
+
+
+//keyboard handling
+//http://stackoverflow.com/questions/4954403/can-jquery-keypress-detect-more-than-one-key-at-the-same-time
+var keys = {};
+
+$(document).keydown(function (e) {
+	keys[e.which] = true;
+	checkKeys(e);
+});
+
+$(document).keyup(function (e) {
+	delete keys[e.which];
+});
+
+function checkKeys(e) {
+	if (keys.hasOwnProperty(13)){
+		updateData();
+	}
+}
 
 // updateData();

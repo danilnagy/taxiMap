@@ -20,10 +20,14 @@ from multiprocessing import Pool
 
 from polyline.codec import PolylineCodec as pl
 import requests
+import os
 
 import operator
 
 
+currentDirectory = os.path.dirname(os.path.abspath(__file__)) + "//"
+
+driver_data = []
 
 app = Flask(__name__)
 
@@ -95,7 +99,7 @@ def predict(data, scaler, model):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+	return render_template("index.html")
 
 @app.route("/getData/")
 def getData():
@@ -104,8 +108,14 @@ def getData():
 	lng1 = str(request.args.get('lng1'))
 	lat2 = str(request.args.get('lat2'))
 	lng2 = str(request.args.get('lng2'))
-	lat3 = str(request.args.get('lat3'))
-	lng3 = str(request.args.get('lng3'))
+	# lat3 = str(request.args.get('lat3'))
+	# lng3 = str(request.args.get('lng3'))
+
+	driver = random.choice(driver_data)
+	lat3 = driver["lat"]
+	lng3 = driver["lng"]
+
+	print lat3, lng3
 
 	w = float(request.args.get('w'))
 	h = float(request.args.get('h'))
@@ -130,11 +140,11 @@ def getData():
 	# # prediction variables
 	# doy = 1 # January 1st
 	dow = 1 # Monday
-	tod = 1 # 6am - noon
+	tod = 15 # 6am - noon
 	# temp = 60 # 60 deg F
 	# condition = 0 # clear
 
-	output = {"type":"FeatureCollection","features":[], "points":[], "points_interp":[]}
+	output = {"type":"FeatureCollection","features":[], "points":[]}
 
 	output["analysis"] = []
 
@@ -189,6 +199,9 @@ def getData():
 
 	# data = []
 
+	all_routes = []
+	all_predictions = []
+
 	prediction_averages = []
 
 	for route in data['routes']:
@@ -211,20 +224,24 @@ def getData():
 				pts = interpolate(route_point, route_points[i+1])
 				all_points += pts
 
+		all_routes.append(all_points)
+
 		predictions = []
 
 		for route_point in all_points:
 
-			feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
-			feature["geometry"]["coordinates"] = route_point
+			# feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+			# feature["geometry"]["coordinates"] = route_point
 
 			data_point = np.asarray([dow, tod, route_point[0], route_point[1]], dtype='float').reshape(1,-1)
 			p = predict(data_point, scaler, dataModel)
 
 			predictions.append(p)
-			feature["properties"]["prediction"] = p
+			# feature["properties"]["prediction"] = p
 
-			output["points"].append(feature)
+			# output["points"].append(feature)
+
+		all_predictions.append(predictions)
 
 		prediction_averages.append(sum(predictions)/float(len(predictions)))
 
@@ -236,25 +253,61 @@ def getData():
 	output["features"][bestRoute]["properties"]["category"] = "best"
 
 
+	feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+	feature["geometry"]["coordinates"] = all_routes[bestRoute][0]
+	feature["properties"]["id"] = "start"
+	output["points"].append(feature)
 
-		# for i, route_point in enumerate(route_points[:-1]):
+	feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+	feature["geometry"]["coordinates"] = all_routes[bestRoute][-1]
+	feature["properties"]["id"] = "end"
+	output["points"].append(feature)
 
-		# 	pts = interpolate(route_point, route_points[i+1])
+	for i, route_point in enumerate(all_routes[bestRoute]):
 
-		# 	for pt in pts:
-		# 		feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
-		# 		feature["geometry"]["coordinates"] = pt
+		if random.random() < all_predictions[bestRoute][i] / float(1000):
 
-		# 		data_point = np.asarray([dow, tod, pt[0], pt[1]], dtype='float').reshape(1,-1)
-		# 		p = predict(data_point, scaler, dataModel)
-		# 		feature["properties"]["prediction"] = p
+			feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+			feature["geometry"]["coordinates"] = route_point
+			feature["properties"]["id"] = "pickup"
+			output["points"].append(feature)
 
-		# 		output["points"].append(feature)
+			break
 
+	feature = {"type":"Feature","properties":{},"geometry":{"type":"Point"}}
+	feature["geometry"]["coordinates"] = [driver["pickup_lat"],driver["pickup_lng"]]
+	feature["properties"]["id"] = "actual"
+	output["points"].append(feature)
 	
-
-
 	return json.dumps(output)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0',port=5000,debug=True,threaded=True)
+
+	fileName = "04_DO_Pairs_130116.csv"
+
+	with open(currentDirectory +  "data//" + fileName, 'r') as f:
+		records = f.readlines()
+		records = [x.strip() for x in records]
+		titles = records.pop(0).split(',')
+
+	driver = {}
+
+	for i, record in enumerate(records):
+		data = record.split(',')
+		if i%2 == 0:
+			driver = {}
+			driver["time"] = data[3]
+			driver["lat"] = data[5]
+			driver["lng"] = data[4]
+		else:
+			driver["pickup_lat"] = data[11]
+			driver["pickup_lng"] = data[10]
+			driver_data.append(driver)
+
+
+
+
+	print len(records)
+
+	app.run(host='0.0.0.0',port=5000,debug=True,threaded=True)
+

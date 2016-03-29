@@ -26,16 +26,34 @@ path#best {
 }
 
 circle {
-	fill-opacity: .1;
-	stroke-width: 0px;
+	fill-opacity: .9;
 }
 
-circle.marker {
+circle#start {
+	r: 7;
+	fill: red;
+}
+
+circle#end {
+	r: 7;
 	fill: blue;
 }
 
-circle.interp {
-	fill: green;
+circle#pickup {
+	r: 12;
+	stroke: black;
+	fill: white;
+	fill-opacity: .9;
+	stroke-width: 2px;
+}
+
+circle#actual {
+	r: 10;
+	stroke: red;
+	fill: white;
+	fill-opacity: .2;
+	stroke-width: 2px;
+	stroke-dasharray: 7,3;
 }
 
 circle:hover {
