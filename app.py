@@ -23,13 +23,27 @@ import requests
 import os
 
 import operator
+import datetime
+from dateutil import parser
+
+app = Flask(__name__)
 
 
-currentDirectory = os.path.dirname(os.path.abspath(__file__)) + "//"
+currentDirectory = os.path.dirname(os.path.abspath(__file__)) + "\\"
 
 driver_data = []
 
-app = Flask(__name__)
+start_time = time.time()
+
+print "loading model..."
+
+with open(currentDirectory + "data//dataModel.pkl", 'rb') as f:
+	dataModel = pickle.load(f)
+
+with open(currentDirectory + "data//scaler.pkl", 'rb') as f:
+	scaler = pickle.load(f)
+
+print "model loaded [" + str(int(time.time() - start_time)) + " sec]"
 
 
 def point_distance(x1, y1, x2, y2):
@@ -122,25 +136,15 @@ def getData():
 	cell_size = float(request.args.get('cell_size'))
 
 
-	start_time = time.time()
-
-	print "loading model..."
-
-	local_path = "C:\\Users\\danil\\Google Drive\\SYNC\\Taxi\\"
-
-	with open(local_path + 'dataModel.pkl', 'rb') as f:
-		dataModel = pickle.load(f)
-
-	with open(local_path + 'scaler.pkl', 'rb') as f:
-		scaler = pickle.load(f)
-
-	print "model loaded [" + str(int(time.time() - start_time)) + " sec]"
-
-
 	# # prediction variables
 	# doy = 1 # January 1st
-	dow = 1 # Monday
-	tod = 15 # 6am - noon
+
+	date = parser.parse(driver["time"])
+	dow = date.strftime("%w")
+	tod = date.strftime("%H")
+
+	# dow = 1 # Monday
+	# tod = 15 # 6am - noon
 	# temp = 60 # 60 deg F
 	# condition = 0 # clear
 
@@ -303,11 +307,6 @@ if __name__ == "__main__":
 			driver["pickup_lat"] = data[11]
 			driver["pickup_lng"] = data[10]
 			driver_data.append(driver)
-
-
-
-
-	print len(records)
 
 	app.run(host='0.0.0.0',port=5000,debug=True,threaded=True)
 
