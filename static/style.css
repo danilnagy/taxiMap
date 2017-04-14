@@ -74,6 +74,11 @@ p.tooltip-text{
 	padding: 0px;
 }
 
+p.display{
+	font-size: 16px;
+	font-weight: bold;
+}
+
 div.menu{
 	position: fixed;
 	margin: 0px;
@@ -81,7 +86,7 @@ div.menu{
 	top: 0px;
 	right: 0px;
 	width: 230px;
-	height: 230px;
+	height: 50px;
 	background: rgba(255,255,255,.8);
 }
 

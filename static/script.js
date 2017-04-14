@@ -15,6 +15,9 @@ var tooltip_price = d3.select("#price");
 
 var map = L.map('map').setView([40.759196, -73.980795], 15);
 
+map._layersMaxZoom = 16;
+map._layersMinZoom = 13;
+
 L.tileLayer('https://api.tiles.mapbox.com/v4/{mapid}/{z}/{x}/{y}.png?access_token={accessToken}', {
 	attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
 	mapid: 'mapbox.light',
@@ -81,6 +84,7 @@ function updateData(){
 
 		console.log(data);
 
+		$( "p.display" ).text(data.time);
 
 		var topleft = projectPoint(lat2, lng1);
 

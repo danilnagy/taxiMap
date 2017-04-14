@@ -151,6 +151,7 @@ def getData():
 	output = {"type":"FeatureCollection","features":[], "points":[]}
 
 	output["analysis"] = []
+	output["time"] = driver["time"]
 
 	numW = int(math.floor(w/cell_size))
 	numH = int(math.floor(h/cell_size))
